@@ -81,5 +81,7 @@ vip_level+total_visit_days
 ds+vip_level+total_visit_days ;
 vip_level+total_visit_days
 
+# 五，比赛结果
 
+经过一段时间的比赛，前三名已经诞生，我们将官方答案与前三名结果在此公开，供大家交流。方案PPT将在这两天更新上来。
 
