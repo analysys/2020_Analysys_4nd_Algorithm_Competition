@@ -1,0 +1,141 @@
+
+Q1:
+set MT_DOP=4;
+use olap_2020;
+select ds, os_dict.os, city_dict.city, uv, pv, sum_price from (
+  select e.ds, os_dict.os_id, city_dict.city_id, count(distinct distinct_id) uv, count(distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, city_dict, os_dict
+  where ds >= 20200801 and ds <= 20200807
+    and e.city = city_dict.city
+    and e.os = os_dict.os
+  group by 1, 2, 3
+  ) t
+  join city_dict on t.city_id = city_dict.city_id
+  join os_dict on t.os_id = os_dict.os_id
+order by 1, 2, 3;
+Fetched 98 row(s) in 332.58s
+
+Q2:
+set MT_DOP=4;
+select ds, firstcommodity, os_version, count(distinct distinct_id) uv, count(distinct_id) pv, count(distinct app_version), count(distinct price)
+from olap_2020.event_parq_sorted
+where xwhat in ('addtoshoppingcart', 'submitorderdetail', 'share', 'payorderdetai')
+ and ds >= 20200801 and ds <= 20200807
+group by 1, 2, 3
+order by 1, 2, 3;
+Fetched 140 row(s) in 29.67s
+
+Q3:
+set MT_DOP=4;
+select * from (
+  select ds, firstcommodity, secondcommodity, commodityname, count(distinct distinct_id) uv, count(distinct_id) pv, sum(IsNull(price, 0)) sum_price
+    from olap_2020.event_parq_sorted
+    where xwhat in ('addtoshoppingcart', 'payorderdetail')
+      and ds >= 20200801 and ds <= 20200807
+    group by 1, 2, 3, 4
+  union all
+  select NULL ds, firstcommodity, secondcommodity, commodityname, count(distinct distinct_id), count(distinct_id), sum(IsNull(price, 0))
+    from olap_2020.event_parq_sorted                                
+    where xwhat in ('addtoshoppingcart', 'payorderdetail')                       
+      and ds >= 20200801 and ds <= 20200807
+    group by 2, 3, 4
+  union all
+  select ds, firstcommodity, NULL secondcommodity, NULL commodityname, count(distinct distinct_id), count(distinct_id), sum(IsNull(price, 0))
+    from olap_2020.event_parq_sorted
+    where xwhat in ('addtoshoppingcart', 'payorderdetail')
+      and ds >= 20200801 and ds <= 20200807
+    group by 1, 2
+  union all
+  select NULL ds, firstcommodity, NULL secondcommodity, NULL commodityname, count(distinct distinct_id), count(distinct_id), sum(IsNull(price, 0))
+    from olap_2020.event_parq_sorted
+    where xwhat in ('addtoshoppingcart', 'payorderdetail')
+      and ds >= 20200801 and ds <= 20200807
+    group by 2
+) t
+order by 1, 2, 3, 4;
+Fetched 6040 row(s) in 78.15s
+
+Q4:
+set MT_DOP=4;
+select ds, IsNull(vip_level, '未知'), total_visit_days, uv, pv, sum_price from (
+  select ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq9 = 1
+  group by 1, 2, 3
+  union all
+  select NULL ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq9 = 1
+  group by 2, 3
+) t
+order by 1, 2, 3
+Fetched 17040 row(s) in 233.51s
+
+Q5:
+set MT_DOP=4;
+select ds, IsNull(vip_level, '未知'), total_visit_days, fqn fq, uv, pv, sum_price from (
+  select 3 fqn, ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq3 = 1
+  group by 2, 3, 4
+  union all
+  select 3 fqn, NULL ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq3 = 1
+  group by 3, 4
+
+  union all
+  select 7 fqn, ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq7 = 1
+  group by 2, 3, 4
+  union all
+  select 7 fqn, NULL ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq7 = 1
+  group by 3, 4
+
+  union all
+  select 8 fqn, ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq8 = 1
+  group by 2, 3, 4
+  union all
+  select 8 fqn, NULL ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq8 = 1
+  group by 3, 4
+
+  union all
+  select 10 fqn, ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq10 = 1
+  group by 2, 3, 4
+  union all
+  select 10 fqn, NULL ds, vip_level, total_visit_days, count(distinct e.distinct_id) uv, count(e.distinct_id) pv, sum(IsNull(price, 0)) sum_price
+  from olap_2020.event_parq_sorted e, olap_2020.profile_parq p
+  where e.distinct_id = p.distinct_id
+    and e.ds >= 20200801 and e.ds <= 20200807
+    and p.fq10 = 1
+  group by 3, 4
+) t
+order by 1, 2, 3, 4;
+Fetched 68160 row(s) in 692.93s
