@@ -1,0 +1,289 @@
+ClickHouse 准备
+===
+
+版本：20.11.1 revision 54441
+相关PR：https://github.com/ClickHouse/ClickHouse/pull/16184
+配置方式参考：https://github.com/hczhcz/PyCK/blob/master/ck/clickhouse/setup.py
+
+建表导入
+===
+
+create table event_raw (
+    id Int64,
+    xwhen Int64,
+    xwhat LowCardinality(String),
+    xwhat_id Int8,
+    json String,
+    ds Int32
+)
+engine=MergeTree
+order by id;
+
+create table profile_raw (
+    id Int64,
+    json String
+)
+engine=MergeTree
+order by id;
+
+for f in ???/*.gz
+do
+    cat $f | gunzip | clickhouse/clickhouse client --query="insert into ???_raw format TSV"
+done
+
+预处理
+===
+
+create table data (
+    id Int64,
+    xwhen Int64,
+    xwhat LowCardinality(String),
+    xwhat_id Int8,
+
+    url LowCardinality(String),
+    title LowCardinality(String),
+    traffic_source_type LowCardinality(String),
+    os LowCardinality(String),
+    os_version LowCardinality(String),
+    country LowCardinality(String),
+    province LowCardinality(String),
+    city LowCardinality(String),
+    app_version LowCardinality(String),
+    firstcommodity LowCardinality(String),
+    secondcommodity LowCardinality(String),
+    commodityname LowCardinality(String),
+    price Nullable(Decimal64(3)),
+    loginmethod LowCardinality(String),
+    signupmethod LowCardinality(String),
+    bannername LowCardinality(String),
+    bannerposition LowCardinality(String),
+    deliverymethod LowCardinality(String),
+    ifusediscount Int8,
+    ifuselntegral Int8,
+    numberoflntegral Nullable(Decimal64(3)),
+    orderamount Nullable(Decimal64(3)),
+    discountamount Nullable(Decimal64(3)),
+    commoditynumber Nullable(Decimal64(3)),
+    hasresult Int8,
+    isrecommend Int8,
+    keyword LowCardinality(String),
+    receivername LowCardinality(String),
+    transportationcosts Nullable(Decimal64(3)),
+    sharemethod LowCardinality(String),
+    storename LowCardinality(String),
+    discountname LowCardinality(String),
+    duration Nullable(Decimal64(3)),
+    commodityscore Nullable(Decimal64(3)),
+    invitationmethod LowCardinality(String),
+    questiontype LowCardinality(String),
+
+    age Nullable(Decimal64(3)),
+    gender LowCardinality(String),
+    email LowCardinality(String),
+    lib LowCardinality(String),
+    lib_version LowCardinality(String),
+    total_visit_days Nullable(Decimal64(3)),
+    vip_level LowCardinality(String),
+    total_amount Nullable(Decimal64(3)),
+    fq1 Int8,
+    fq2 Int8,
+    fq3 Int8,
+    fq4 Int8,
+    fq5 Int8,
+    fq6 Int8,
+    fq7 Int8,
+    fq8 Int8,
+    fq9 Int8,
+    fq10 Int8,
+    fq11 Int8,
+    fq12 Int8,
+    fq13 Int8,
+    fq14 Int8,
+    fq15 Int8,
+    fq16 Int8,
+    fq17 Int8,
+    fq18 Int8,
+    fq19 Int8,
+    fq20 Int8,
+    fq21 Int8,
+    fq22 Int8,
+    fq23 Int8,
+    fq24 Int8,
+    fq25 Int8,
+
+    ds Int32
+)
+engine=MergeTree
+order by id;
+
+insert into data
+select
+    event_raw.id,
+    event_raw.xwhen,
+    event_raw.xwhat,
+    event_raw.xwhat_id,
+
+    JSONExtractString(event_raw.json, 'url'),
+    JSONExtractString(event_raw.json, 'title'),
+    JSONExtractString(event_raw.json, 'traffic_source_type'),
+    JSONExtractString(event_raw.json, 'os'),
+    JSONExtractString(event_raw.json, 'os_version'),
+    JSONExtractString(event_raw.json, 'country'),
+    JSONExtractString(event_raw.json, 'province'),
+    JSONExtractString(event_raw.json, 'city'),
+    JSONExtractString(event_raw.json, 'app_version'),
+    JSONExtractString(event_raw.json, 'firstcommodity'),
+    JSONExtractString(event_raw.json, 'secondcommodity'),
+    JSONExtractString(event_raw.json, 'commodityname'),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'price'), 3),
+    JSONExtractString(event_raw.json, 'loginmethod'),
+    JSONExtractString(event_raw.json, 'signupmethod'),
+    JSONExtractString(event_raw.json, 'bannername'),
+    JSONExtractString(event_raw.json, 'bannerposition'),
+    JSONExtractString(event_raw.json, 'deliverymethod'),
+    ifNull(toInt8OrNull(JSONExtractRaw(event_raw.json, 'ifusediscount')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(event_raw.json, 'ifuselntegral')), -1),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'numberoflntegral'), 3),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'orderamount'), 3),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'discountamount'), 3),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'commoditynumber'), 3),
+    ifNull(toInt8OrNull(JSONExtractRaw(event_raw.json, 'hasresult')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(event_raw.json, 'isrecommend')), -1),
+    JSONExtractString(event_raw.json, 'keyword'),
+    JSONExtractString(event_raw.json, 'receivername'),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'transportationcosts'), 3),
+    JSONExtractString(event_raw.json, 'sharemethod'),
+    JSONExtractString(event_raw.json, 'storename'),
+    JSONExtractString(event_raw.json, 'discountname'),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'duration'), 3),
+    toDecimal64OrNull(JSONExtractRaw(event_raw.json, 'commodityscore'), 3),
+    JSONExtractString(event_raw.json, 'invitationmethod'),
+    JSONExtractString(event_raw.json, 'questiontype'),
+
+    toDecimal64OrNull(JSONExtractRaw(profile_raw.json, 'age'), 3),
+    JSONExtractString(profile_raw.json, 'gender'),
+    JSONExtractString(profile_raw.json, 'email'),
+    JSONExtractString(profile_raw.json, 'lib'),
+    JSONExtractString(profile_raw.json, 'lib_version'),
+    toDecimal64OrNull(JSONExtractRaw(profile_raw.json, 'total_visit_days'), 3),
+    JSONExtractString(profile_raw.json, 'vip_level'),
+    toDecimal64OrNull(JSONExtractRaw(profile_raw.json, 'total_amount'), 3),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq1')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq2')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq3')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq4')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq5')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq6')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq7')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq8')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq9')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq10')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq11')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq12')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq13')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq14')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq15')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq16')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq17')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq18')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq19')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq20')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq21')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq22')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq23')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq24')), -1),
+    ifNull(toInt8OrNull(JSONExtractRaw(profile_raw.json, 'fq25')), -1),
+
+    event_raw.ds
+from event_raw
+inner join profile_raw
+on event_raw.id = profile_raw.id;
+
+分片
+===
+
+create table data_part_id as data;
+
+insert into data_part_id
+select
+    *
+from data
+where cityHash64(id) % 3 = ???;
+
+create table data_part_ds as data;
+
+insert into data_part_ds
+select
+    *
+from data
+where ds % 3 = ???;
+
+增量额外数据
+===
+
+create table event_raw_extra as event_raw;
+
+insert into event_raw_extra
+select
+    *
+from event_raw
+prewhere id not in (
+    select
+        id
+    from profile_raw
+);
+
+增量导入
+===
+
+create table event_raw_new as event_raw;
+
+create table profile_raw_new as profile_raw;
+
+create table data_new as data;
+
+for f in ???/*.gz
+do
+    cat $f | gunzip | clickhouse/clickhouse client --query="insert into ???_raw_new format TSV"
+done
+
+insert into event_raw_extra
+select
+    *
+from event_raw_new;
+
+insert into profile_raw
+select
+    *
+from profile_raw_new;
+
+insert into data_new
+select
+    ???
+from event_raw_extra as event_raw
+inner join profile_raw
+on event_raw.id = profile_raw.id;
+
+insert into data
+select
+    *
+from data_new;
+
+insert into data_part_id
+select
+    *
+from data_new
+where cityHash64(id) % 3 = ???;
+
+insert into data_part_ds
+select
+    *
+from data_new
+where ds % 3 = ???;
+
+优化
+===
+
+optimize table data;
+optimize table data_part_id;
+optimize table data_part_ds;
