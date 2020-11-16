@@ -1,0 +1,250 @@
+# HDFS、Hive均使用默认配置
+# 编译完Impala后，在ark-1启动catalogd、statestored和impalad
+bin/start-impala-cluster.py -r -s 1
+
+# 在ark-2和ark-3启动impalad
+# 配置环境变量
+source bin/impala-config.sh
+export LD_LIBRARY_PATH=/data1/impala/toolchain/toolchain-packages-gcc7.5.0/gcc-7.5.0/lib64:/data1/impala/toolchain/toolchain-packages-gcc7.5.0/kudu-5ad5d3d66/debug/lib:/data1/impala/toolchain/toolchain-packages-gcc7.5.0/kudu-5ad5d3d66/debug/lib64:/data1/impala/toolchain/toolchain-packages-gcc7.5.0/gcc-7.5.0/lib64
+export CLASSPATH="$IMPALA_HOME"/fe/src/test/resources:"$IMPALA_HOME"/fe/target/'*':"$IMPALA_HOME"/fe/target/dependency/'*'
+# 手动启动
+/data1/impala/be/build/latest/service/impalad -disconnected_session_timeout 21600 -kudu_client_rpc_timeout_ms 0 -kudu_master_hosts localhost -mem_limit=12884901888 -logbufsecs=5 -v=1 -max_log_files=10 -log_filename=impalad -log_dir=/data1/impala/logs/cluster -beeswax_port=21000 -hs2_port=21050 -hs2_http_port=28000 -be_port=22000 -krpc_port=27000 -state_store_subscriber_port=23000 -webserver_port=25000 -state_store_host=ark-1 -catalog_service_host=ark-1
+
+# 创建文本格式的临时表以上传gzip文件
+create database olap_2020;
+use olap_2020;
+create table event_txt (
+  distinct_id bigint,
+  xwhen bigint,
+  xwhat string,
+  xwhat_id int,
+  json string,
+  ds int
+)
+ROW FORMAT DELIMITED
+  FIELDS TERMINATED BY '\t'
+stored as textfile;
+
+create table profile_txt (
+  distinct_id bigint,
+  json string
+)
+ROW FORMAT DELIMITED
+  FIELDS TERMINATED BY '\t'
+stored as textfile;
+
+# 创建Parquet格式的表以导入数据
+create table event_parq_sorted (
+  distinct_id bigint,
+  xwhen bigint,
+  xwhat_id int,
+  url   string,
+  title string,
+  traffic_source_type   string,
+  os    string,
+  os_version    string,
+  country       string,
+  province      string,
+  city  string,
+  app_version   string,
+  firstcommodity        string,
+  secondcommodity       string,
+  commodityname string,
+  price decimal(18,3),
+  loginmethod   string,
+  signupmethod  string,
+  bannername    string,
+  bannerposition        string,
+  deliverymethod        string,
+  ifusediscount int,
+  ifuselntegral int,
+  numberoflntegral      decimal(18,3),
+  orderamount   decimal(18,3),
+  discountamount        decimal(18,3),
+  commoditynumber       decimal(18,3),
+  hasresult     int,
+  isrecommend   int,
+  keyword       string,
+  receivername  string,
+  transportationcosts   decimal(18,3),
+  sharemethod   string,
+  storename     string,
+  discountname  string,
+  duration      decimal(18,3),
+  commodityscore        decimal(18,3),
+  invitationmethod      string,
+  questiontype  string
+) partitioned by (
+  ds int,
+  xwhat string
+) sort by (
+  distinct_id
+) stored as parquet;
+
+create table olap_2020.profile_parq (
+  distinct_id bigint,
+  age   decimal(18,3), 
+  gender        string, 
+  email string, 
+  lib   string, 
+  lib_version   string, 
+  total_visit_days      decimal(18,3), 
+  vip_level     string, 
+  total_amount  decimal(18,3), 
+  fq1   int, 
+  fq2   int, 
+  fq3   int, 
+  fq4   int, 
+  fq5   int, 
+  fq6   int, 
+  fq7   int, 
+  fq8   int, 
+  fq9   int, 
+  fq10  int, 
+  fq11  int, 
+  fq12  int, 
+  fq13  int, 
+  fq14  int, 
+  fq15  int, 
+  fq16  int, 
+  fq17  int, 
+  fq18  int, 
+  fq19  int, 
+  fq20  int, 
+  fq21  int, 
+  fq22  int, 
+  fq23  int, 
+  fq24  int, 
+  fq25  int
+) stored as parquet;
+
+# 上传文件到临时表。上传文件时指定block size，保证每个gzip文件占一个block
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_092117_03200_6mchw_1b340ece-0d6a-4c8e-ae2b-fbb8040d2673.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200916_015142_00722_6mchw_02f982ae-9746-457f-bc29-9573ce1676fe.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_080312_02461_6mchw_5b6d3c3c-caa0-472e-918d-d6779e6c8ef3.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_085811_02881_6mchw_4214484c-9030-4add-b4a9-502f6eb4013c.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_085811_02881_6mchw_81622f42-2b4b-494f-a33f-fe0f6a18857e.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_085811_02881_6mchw_7d8a59ce-b191-4637-bab1-898fe0e0d10a.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_092117_03200_6mchw_e5c5280d-cead-4907-84ba-17ad356d3272.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200916_020119_00902_6mchw_a0cc56ee-fcdc-4920-b300-9cb591189ec8.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_085811_02881_6mchw_4bb27dbb-e09e-4781-8cb5-d933b0249ebf.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200916_020119_00902_6mchw_cd1d350f-85b9-422f-9af2-cb97c0e1d36c.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_080312_02461_6mchw_5ebb3f27-b044-4ce2-9068-a6ee8d4723bf.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_092117_03200_6mchw_0448b90c-7632-4b29-9db2-5b164e63661d.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/event_olap_formal/20200915_080312_02461_6mchw_571e4879-ffce-4a47-8194-0466e54c9a76.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_085811_02881_6mchw_040ca5a1-09bc-4347-80a0-ecdaacaf39d0.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_105919_03738_6mchw_3b8f6835-1a42-4511-9ea2-97f6b5e6d13a.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_093013_03289_6mchw_e13ca6e9-9fd6-457f-8ecd-0b3cc58550f7.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_092117_03200_6mchw_ecd88ff0-8a67-444a-b0e5-eedffd248c7f.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200916_020119_00902_6mchw_3bbf62ff-706b-4660-a2f4-dd9a5cfafbef.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200916_015142_00722_6mchw_0a3ab50d-4871-4d18-9b2c-665efd4f3da3.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_080312_02461_6mchw_458cf8c5-9ebe-478d-8949-e4ce440f782a.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_105919_03738_6mchw_3e99c90a-61a8-42d1-8c29-ca763ae361cd.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200916_020119_00902_6mchw_13ee4f6e-3491-4bd7-a8d6-ce0f931fc575.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_093013_03289_6mchw_9e58190c-19d0-4bc0-a94c-18e17dc91f9b.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_093013_03289_6mchw_727e56b2-ce28-48d9-be61-86111c0c8883.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200916_015142_00722_6mchw_7900fb65-c84d-4332-b45a-d48989078813.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_105919_03738_6mchw_9cf25525-902d-43bf-a0a0-db539d74831b.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_105919_03738_6mchw_8270fec6-47a2-44bc-bc2e-5438b9ce94ba.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=805306368 -copyFromLocal /data1/event_olap_formal/20200915_093013_03289_6mchw_b4ca25cd-40bc-4ac1-9b99-600c147c7122.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1073741824 -copyFromLocal /data1/event_olap_formal/20200915_092117_03200_6mchw_39385344-4944-449a-b2cc-21eadcbce2d7.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1073741824 -copyFromLocal /data1/event_olap_formal/20200915_093013_03289_6mchw_f954de73-efdc-4373-beff-468ccbe364b7.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1073741824 -copyFromLocal /data1/event_olap_formal/20200915_080312_02461_6mchw_050f5ccf-b2b4-4aad-97d2-4b1e424a7471.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1073741824 -copyFromLocal /data1/event_olap_formal/20200916_020119_00902_6mchw_dee3cf6b-d63d-4115-a4f5-439eadbc8557.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1073741824 -copyFromLocal /data1/event_olap_formal/20200916_015142_00722_6mchw_42744227-e04a-4619-9ddd-394c0e9e733f.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1073741824 -copyFromLocal /data1/event_olap_formal/20200915_105919_03738_6mchw_0263785a-70ef-40f5-8f34-c07ff3dc077b.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+hadoop fs -Ddfs.blocksize=1342177280 -copyFromLocal /data1/event_olap_formal/20200916_015142_00722_6mchw_d038b578-3241-4e22-96ab-524c693876f4.gz hdfs://ark-1:20500/test-warehouse/olap_2020.db/event_txt
+
+hadoop fs -Ddfs.blocksize=536870912 -copyFromLocal /data1/profile_olap_formal/* hdfs://ark-1:20500/test-warehouse/olap_2020.db/profile_txt
+
+# 生成Parquet数据
+refresh olap_2020.event_txt;
+refresh olap_2020.profile_txt;
+insert into olap_2020.event_parq_sorted partition(ds, xwhat)
+select
+  distinct_id,
+  xwhen,
+  xwhat_id,
+  get_json_object(json, '$.url'),
+  get_json_object(json, '$.title'),
+  get_json_object(json, '$.traffic_source_type'),
+  get_json_object(json, '$.os'),
+  get_json_object(json, '$.os_version'),
+  get_json_object(json, '$.country'),
+  get_json_object(json, '$.province'),
+  get_json_object(json, '$.city'),
+  get_json_object(json, '$.app_version'),
+  get_json_object(json, '$.firstcommodity'),
+  get_json_object(json, '$.secondcommodity'),
+  get_json_object(json, '$.commodityname'),
+  cast(get_json_object(json, '$.price') as decimal(18,3)),
+  get_json_object(json, '$.loginmethod'),
+  get_json_object(json, '$.signupmethod'),
+  get_json_object(json, '$.bannername'),
+  get_json_object(json, '$.bannerposition'),
+  get_json_object(json, '$.deliverymethod'),
+  cast(cast(get_json_object(json, '$.ifusediscount') as int) as boolean),
+  cast(cast(get_json_object(json, '$.ifuselntegral') as int) as boolean),
+  cast(get_json_object(json, '$.numberoflntegral') as decimal(18,3)),
+  cast(get_json_object(json, '$.orderamount') as decimal(18,3)),
+  cast(get_json_object(json, '$.discountamount') as decimal(18,3)),
+  cast(get_json_object(json, '$.commoditynumber') as decimal(18,3)),
+  cast(cast(get_json_object(json, '$.hasresult') as int) as boolean),
+  cast(cast(get_json_object(json, '$.isrecommend') as int) as boolean),
+  get_json_object(json, '$.keyword'),
+  get_json_object(json, '$.receivername'),
+  cast(get_json_object(json, '$.transportationcosts') as decimal(18,3)),
+  get_json_object(json, '$.sharemethod'),
+  get_json_object(json, '$.storename'),
+  get_json_object(json, '$.discountname'),
+  cast(get_json_object(json, '$.duration') as decimal(18,3)),
+  cast(get_json_object(json, '$.commodityscore') as decimal(18,3)),
+  get_json_object(json, '$.invitationmethod'),
+  get_json_object(json, '$.questiontype'),
+  ds,
+  xwhat
+from olap_2020.event_txt;
+
+insert into olap_2020.profile_parq
+select distinct_id,
+  cast(get_json_object(json, '$.age') as decimal(18,3)),
+  get_json_object(json, '$.gender'),
+  get_json_object(json, '$.email'),
+  get_json_object(json, '$.lib'),
+  get_json_object(json, '$.lib_version'),
+  cast(get_json_object(json, '$.total_visit_days') as decimal(18,3)),
+  get_json_object(json, '$.vip_level'),
+  cast(get_json_object(json, '$.total_amount') as decimal(18,3)),
+  cast(get_json_object(json, '$.fq1') as int),
+  cast(get_json_object(json, '$.fq2') as int),
+  cast(get_json_object(json, '$.fq3') as int),
+  cast(get_json_object(json, '$.fq4') as int),
+  cast(get_json_object(json, '$.fq5') as int),
+  cast(get_json_object(json, '$.fq6') as int),
+  cast(get_json_object(json, '$.fq7') as int),
+  cast(get_json_object(json, '$.fq8') as int),
+  cast(get_json_object(json, '$.fq9') as int),
+  cast(get_json_object(json, '$.fq10') as int),
+  cast(get_json_object(json, '$.fq11') as int),
+  cast(get_json_object(json, '$.fq12') as int),
+  cast(get_json_object(json, '$.fq13') as int),
+  cast(get_json_object(json, '$.fq14') as int),
+  cast(get_json_object(json, '$.fq15') as int),
+  cast(get_json_object(json, '$.fq16') as int),
+  cast(get_json_object(json, '$.fq17') as int),
+  cast(get_json_object(json, '$.fq18') as int),
+  cast(get_json_object(json, '$.fq19') as int),
+  cast(get_json_object(json, '$.fq20') as int),
+  cast(get_json_object(json, '$.fq21') as int),
+  cast(get_json_object(json, '$.fq22') as int),
+  cast(get_json_object(json, '$.fq23') as int),
+  cast(get_json_object(json, '$.fq24') as int),
+  cast(get_json_object(json, '$.fq25') as int)
+from olap_2020.profile_txt;
+
+# 生成字典表
+create table city_dict as select city, row_number() over(order by city) city_id from (select distinct city from event_parq_sorted) t;
+create table os_dict as select os, row_number() over(order by os) os_id from (select distinct os from event_parq_sorted) t;
+create table os_version_dict as select os_version, row_number() over(order by os_version) os_version_id from (select distinct os_version from event_parq_sorted) t;
+create table app_version_dict as select app_version, row_number() over(order by app_version) app_version_id from (select distinct app_version from event_parq_sorted) t;
+
